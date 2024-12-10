@@ -1,7 +1,6 @@
 # 💡 ImpactChain: Transparent Charitable Giving Platform
 
 ## 🌍 Project Overview
-
 ImpactChain is a revolutionary blockchain-powered platform designed to transform charitable donations through transparency, accountability, and direct impact tracking.
 
 ## 🚀 Key Features
