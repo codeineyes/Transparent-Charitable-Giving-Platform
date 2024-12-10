@@ -59,27 +59,27 @@ describe('Impact Measurement Contract', () => {
   });
   
   it('should register a device', () => {
-    const result = mockContractCall('impact-measurement', 'register-device', [deviceId, projectId, '"temperature-sensor"'], contractOwner);
+    const result = mockContractCall('register-device', [deviceId, projectId, '"temperature-sensor"']);
     expect(result).toEqual({ success: true, value: true });
   });
   
   it('should update device reading', () => {
-    mockContractCall('impact-measurement', 'register-device', [deviceId, projectId, '"temperature-sensor"'], contractOwner);
-    const result = mockContractCall('impact-measurement', 'update-device-reading', [deviceId, 'u1234567890', '25'], contractOwner);
+    mockContractCall('register-device', [deviceId, projectId, '"temperature-sensor"']);
+    const result = mockContractCall('update-device-reading', [deviceId, 'u1234567890', '25']);
     expect(result).toEqual({ success: true, value: true });
   });
   
   it('should get device info', () => {
-    mockContractCall('impact-measurement', 'register-device', [deviceId, projectId, '"temperature-sensor"'], contractOwner);
-    mockContractCall('impact-measurement', 'update-device-reading', [deviceId, 'u1234567890', '25'], contractOwner);
-    const result = mockContractCall('impact-measurement', 'get-device-info', [deviceId]);
+    mockContractCall('register-device', [deviceId, projectId, '"temperature-sensor"']);
+    mockContractCall('update-device-reading', [deviceId, 'u1234567890', '25']);
+    const result = mockContractCall('get-device-info', [deviceId]);
     expect(result).toEqual({ success: true, value: { project_id: 1, device_type: 'temperature-sensor', last_reading: { timestamp: 1234567890, value: 25 } } });
   });
   
   it('should get project impact', () => {
-    mockContractCall('impact-measurement', 'register-device', [deviceId, projectId, '"temperature-sensor"'], contractOwner);
-    mockContractCall('impact-measurement', 'update-device-reading', [deviceId, 'u1234567890', '25'], contractOwner);
-    const result = mockContractCall('impact-measurement', 'get-project-impact', [projectId]);
+    mockContractCall('register-device', [deviceId, projectId, '"temperature-sensor"']);
+    mockContractCall('update-device-reading', [deviceId, 'u1234567890', '25']);
+    const result = mockContractCall('get-project-impact', [projectId]);
     expect(result).toEqual({ success: true, value: { total_impact: 25, last_updated: 1234567890 } });
   });
 });
