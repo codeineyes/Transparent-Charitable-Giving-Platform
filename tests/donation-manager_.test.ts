@@ -61,30 +61,33 @@ describe('Donation Manager Contract', () => {
   });
   
   it('should allow donations', () => {
-    const result = mockContractCall('donation-manager', 'donate', [charity, 'u1000'], donor);
+    const result = mockContractCall('donate', [charity, 'u1000']);
     expect(result).toEqual({ success: true, value: 1 });
   });
   
   it('should release funds', () => {
-    mockContractCall('donation-manager', 'donate', [charity, 'u1000'], donor);
-    const result = mockContractCall('donation-manager', 'release-funds', ['u1'], contractOwner);
+    mockContractCall('donate', [charity, 'u1000']);
+    const result = mockContractCall('release-funds', ['u1']);
     expect(result).toEqual({ success: true, value: true });
   });
   
   it('should get donation info', () => {
-    mockContractCall('donation-manager', 'donate', [charity, 'u1000'], donor);
-    const result = mockContractCall('donation-manager', 'get-donation', ['u1']);
-    expect(result).toEqual({ success: true, value: {
+    mockContractCall('donate', [charity, 'u1000']);
+    const result = mockContractCall('get-donation', ['u1']);
+    expect(result).toEqual({
+      success: true,
+      value: {
         donor: 'tx-sender',
         charity: charity,
         amount: 1000,
         status: 'pending'
-      }});
+      }
+    });
   });
   
   it('should get charity funds', () => {
-    mockContractCall('donation-manager', 'donate', [charity, 'u1000'], donor);
-    const result = mockContractCall('donation-manager', 'get-charity-funds', [charity]);
+    mockContractCall('donate', [charity, 'u1000']);
+    const result = mockContractCall('get-charity-funds', [charity]);
     expect(result).toEqual({ success: true, value: { total_funds: 1000 } });
   });
 });

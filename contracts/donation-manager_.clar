@@ -1,73 +1,78 @@
-;; Donation Manager Contract
+;; Milestone Tracker Contract
 
-(define-data-var last-donation-id uint u0)
+(use-trait donation-manager-trait .donation-manager.donation-manager)
 
-(define-map donations
-  { donation-id: uint }
+(define-map project-milestones
+  { project-id: uint }
   {
-    donor: principal,
     charity: principal,
-    amount: uint,
-    status: (string-ascii 20)
+    milestones: (list 10 {
+      description: (string-ascii 100),
+      amount: uint,
+      status: (string-ascii 20)
+    })
   }
 )
 
-(define-map charity-funds
-  { charity: principal }
-  { total-funds: uint }
-)
+(define-data-var last-project-id uint u0)
 
 (define-constant contract-owner tx-sender)
 (define-constant err-owner-only (err u100))
 (define-constant err-not-authorized (err u101))
-(define-constant err-invalid-donation (err u102))
+(define-constant err-invalid-project (err u102))
 
-(define-public (donate (charity principal) (amount uint))
+(define-public (create-project (charity principal) (milestones (list 10 {description: (string-ascii 100), amount: uint})))
   (let
     (
-      (new-donation-id (+ (var-get last-donation-id) u1))
-      (current-funds (default-to { total-funds: u0 } (map-get? charity-funds { charity: charity })))
+      (new-project-id (+ (var-get last-project-id) u1))
     )
-    (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
-    (map-set donations
-      { donation-id: new-donation-id }
+    (asserts! (is-eq tx-sender contract-owner) err-owner-only)
+    (map-set project-milestones
+      { project-id: new-project-id }
       {
-        donor: tx-sender,
         charity: charity,
-        amount: amount,
-        status: "pending"
+        milestones: (map add-status milestones)
       }
     )
-    (map-set charity-funds
-      { charity: charity }
-      { total-funds: (+ (get total-funds current-funds) amount) }
-    )
-    (var-set last-donation-id new-donation-id)
-    (ok new-donation-id)
+    (var-set last-project-id new-project-id)
+    (ok new-project-id)
   )
 )
 
-(define-public (release-funds (donation-id uint))
+(define-private (add-status (milestone {description: (string-ascii 100), amount: uint}))
+  (merge milestone { status: "pending" })
+)
+
+(define-private (replace-at-index (lst (list 10 {description: (string-ascii 100), amount: uint, status: (string-ascii 20)})) (index uint) (new-item {description: (string-ascii 100), amount: uint, status: (string-ascii 20)}))
+  (let ((len (len lst)))
+    (if (>= index len)
+      lst
+      (let ((left (take index lst))
+            (right (drop (+ index u1) lst)))
+        (concat (concat left (list new-item)) right)))))
+
+(define-public (complete-milestone (project-id uint) (milestone-index uint) (donation-manager <donation-manager-trait>))
   (let
     (
-      (donation (unwrap! (map-get? donations { donation-id: donation-id }) err-invalid-donation))
+      (project (unwrap! (map-get? project-milestones { project-id: project-id }) err-invalid-project))
+      (milestone (unwrap! (element-at (get milestones project) milestone-index) err-invalid-project))
     )
     (asserts! (is-eq tx-sender contract-owner) err-owner-only)
-    (asserts! (is-eq (get status donation) "pending") err-not-authorized)
-    (try! (as-contract (stx-transfer? (get amount donation) tx-sender (get charity donation))))
-    (map-set donations
-      { donation-id: donation-id }
-      (merge donation { status: "released" })
+    (asserts! (is-eq (get status milestone) "pending") err-not-authorized)
+    (try! (contract-call? donation-manager release-funds (get amount milestone)))
+    (map-set project-milestones
+      { project-id: project-id }
+      (merge project {
+        milestones: (replace-at-index (get milestones project)
+                                      milestone-index
+                                      (merge milestone { status: "completed" }))
+      })
     )
     (ok true)
   )
 )
 
-(define-read-only (get-donation (donation-id uint))
-  (ok (unwrap! (map-get? donations { donation-id: donation-id }) err-invalid-donation))
-)
-
-(define-read-only (get-charity-funds (charity principal))
-  (ok (default-to { total-funds: u0 } (map-get? charity-funds { charity: charity })))
+(define-read-only (get-project-milestones (project-id uint))
+  (ok (unwrap! (map-get? project-milestones { project-id: project-id }) err-invalid-project))
 )
 
