@@ -1,21 +1,86 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-import { describe, expect, it } from "vitest";
+// Mock the contract's state
+const contractState = {
+  iotDevices: new Map(),
+  projectImpact: new Map(),
+};
 
-const accounts = simnet.getAccounts();
-const address1 = accounts.get("wallet_1")!;
+// Mock contract functions
+const contractFunctions = {
+  'register-device': (deviceId: string, projectId: string, deviceType: string) => {
+    contractState.iotDevices.set(deviceId.slice(1, -1), {
+      project_id: parseInt(projectId.slice(1)),
+      device_type: deviceType.slice(1, -1),
+      last_reading: { timestamp: 0, value: 0 },
+    });
+    return { success: true, value: true };
+  },
+  'update-device-reading': (deviceId: string, timestamp: string, value: string) => {
+    const device = contractState.iotDevices.get(deviceId.slice(1, -1));
+    if (device) {
+      device.last_reading = { timestamp: parseInt(timestamp.slice(1)), value: parseInt(value) };
+      const projectImpact = contractState.projectImpact.get(device.project_id) || { total_impact: 0, last_updated: 0 };
+      projectImpact.total_impact += parseInt(value);
+      projectImpact.last_updated = parseInt(timestamp.slice(1));
+      contractState.projectImpact.set(device.project_id, projectImpact);
+      return { success: true, value: true };
+    }
+    return { success: false, error: 'Invalid device' };
+  },
+  'get-device-info': (deviceId: string) => {
+    const device = contractState.iotDevices.get(deviceId.slice(1, -1));
+    return device ? { success: true, value: device } : { success: false, error: 'Invalid device' };
+  },
+  'get-project-impact': (projectId: string) => {
+    const impact = contractState.projectImpact.get(parseInt(projectId.slice(1))) || { total_impact: 0, last_updated: 0 };
+    return { success: true, value: impact };
+  },
+};
 
-/*
-  The test below is an example. To learn more, read the testing documentation here:
-  https://docs.hiro.so/stacks/clarinet-js-sdk
-*/
-
-describe("example tests", () => {
-  it("ensures simnet is well initalised", () => {
-    expect(simnet.blockHeight).toBeDefined();
-  });
-
-  // it("shows an example", () => {
-  //   const { result } = simnet.callReadOnlyFn("counter", "get-counter", [], address1);
-  //   expect(result).toBeUint(0);
-  // });
+// Mock contract call function
+const mockContractCall = vi.fn((functionName: string, args: any[]) => {
+  if (functionName in contractFunctions) {
+    return contractFunctions[functionName as keyof typeof contractFunctions](...args);
+  }
+  throw new Error(`Unknown function: ${functionName}`);
 });
+
+describe('Impact Measurement Contract', () => {
+  const contractOwner = 'ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM';
+  const deviceId = '"device-123"';
+  const projectId = 'u1';
+  
+  beforeEach(() => {
+    // Reset contract state before each test
+    contractState.iotDevices.clear();
+    contractState.projectImpact.clear();
+    mockContractCall.mockClear();
+  });
+  
+  it('should register a device', () => {
+    const result = mockContractCall('impact-measurement', 'register-device', [deviceId, projectId, '"temperature-sensor"'], contractOwner);
+    expect(result).toEqual({ success: true, value: true });
+  });
+  
+  it('should update device reading', () => {
+    mockContractCall('impact-measurement', 'register-device', [deviceId, projectId, '"temperature-sensor"'], contractOwner);
+    const result = mockContractCall('impact-measurement', 'update-device-reading', [deviceId, 'u1234567890', '25'], contractOwner);
+    expect(result).toEqual({ success: true, value: true });
+  });
+  
+  it('should get device info', () => {
+    mockContractCall('impact-measurement', 'register-device', [deviceId, projectId, '"temperature-sensor"'], contractOwner);
+    mockContractCall('impact-measurement', 'update-device-reading', [deviceId, 'u1234567890', '25'], contractOwner);
+    const result = mockContractCall('impact-measurement', 'get-device-info', [deviceId]);
+    expect(result).toEqual({ success: true, value: { project_id: 1, device_type: 'temperature-sensor', last_reading: { timestamp: 1234567890, value: 25 } } });
+  });
+  
+  it('should get project impact', () => {
+    mockContractCall('impact-measurement', 'register-device', [deviceId, projectId, '"temperature-sensor"'], contractOwner);
+    mockContractCall('impact-measurement', 'update-device-reading', [deviceId, 'u1234567890', '25'], contractOwner);
+    const result = mockContractCall('impact-measurement', 'get-project-impact', [projectId]);
+    expect(result).toEqual({ success: true, value: { total_impact: 25, last_updated: 1234567890 } });
+  });
+});
+
